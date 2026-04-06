@@ -19,6 +19,7 @@
     }
     const $body = document.querySelector('body')
     const $textarea = document.querySelector('#note-content')
+    const $titleinput = document.querySelector('#note-title-input')
     const $list = document.querySelector('#list')
     const $mode_switcher = document.querySelector('#mode-switcher')
     const $setting_gear = document.querySelector('#setting-icon')
@@ -73,11 +74,11 @@
     const _render = (rendernote) => {
       $body.style.backgroundColor = "#ffffff"
       const _renderList = list => {
-        const _makeTitleString = content => content.substr(0, 50).replace(/<.*?>/g, '').replace(/[^A-Za-z0-9 ]/g, '').substr(0, 10) || '<span class="empty-string">(EMPTY)</span>'
+        const _makeTitleString = item => item.title ? item.title : (item.content.substr(0, 50).replace(/<.*?>/g, '').replace(/[^A-Za-z0-9 ]/g, '').substr(0, 10) || '<span class="empty-string">(EMPTY)</span>')
         const $ul = document.querySelector('ul')
 
         $ul.innerHTML = list.sort((a, b) => b.time - a.time).map((item, index) => {
-          let title = _makeTitleString(item.content)
+          let title = _makeTitleString(item)
           let className = index === currentNoteId ? 'current' : ''
           return `<li class="${className}" data-id="${index}"><span>${title}<div class='del'>+</div><div class='dnld'><img class="dnldimg" src="./dnld.png" alt="Download"></div></span></li>`
         }).join('')
@@ -94,7 +95,7 @@
             if (event.target.classList.contains('del')) {
               const currentNote = list[index]
               if (currentNote.content !== '') {
-                const noteTitle = _makeTitleString(currentNote.content)
+                const noteTitle = _makeTitleString(currentNote)
                 const deleteConfirmString = `Do you want to delete note: ${noteTitle}?`
                 if (!confirm(deleteConfirmString)) { return }
               }
@@ -120,7 +121,7 @@
             else if (event.target.classList.contains('dnld') || event.target.classList.contains('dnldimg')) {
               currentNoteId = index
               _render(true)
-              const noteTitle = _makeTitleString(list[index].content)
+              const noteTitle = _makeTitleString(list[index])
               //const dbutton = $li.querySelector('.dnld');
               //console.log(dbutton);
 
@@ -152,6 +153,7 @@
       }
 
       const _renderNote = note => {
+        $titleinput.value = note.title || ''
         $textarea.innerHTML = note.content || ''
         $textarea.focus()
       }
@@ -165,7 +167,7 @@
     const _enableAnimation = () => {
       setTimeout(() => {
         document.querySelector('style').innerHTML += `
-#create_entry, #note-content, #mode-switcher,
+#create_entry, #note-content, #note-title-input, #mode-switcher,
 #addon-author, #list, #list li > span, #list .current:before {
 transition-duration: .2s;
 }
@@ -177,9 +179,9 @@ transition-duration: .2s;
       // auto saving and indicator, also a save timeout so you can't exceed GitHub's rate limits
       let write_timeout, save_timeout;
       let timed_out = false, buffered = false;
-      $textarea.addEventListener('keyup', () => {
+      const handleInput = () => {
         //if note didnt change
-        if (data.list[currentNoteId].content === $textarea.innerHTML) { return }
+        if (data.list[currentNoteId].content === $textarea.innerHTML && (data.list[currentNoteId].title || '') === $titleinput.value) { return }
 
         $status.classList.remove('hide')
         $status.textContent = 'Saving...'
@@ -201,27 +203,31 @@ transition-duration: .2s;
             buffered = true
           }
         }, 250)
+      }
+      $textarea.addEventListener('keyup', handleInput)
+      $titleinput.addEventListener('keyup', handleInput)
 
-        const _saveNote = async () => {
-          console.log("saving")
-          //save to local storage
-          data.list[currentNoteId].content = $textarea.innerHTML
-          data.list[currentNoteId].time = (new Date()).getTime()
-          currentNoteId = 0
-          browser.storage.local.set({ list: data.list })
+      const _saveNote = async () => {
+        console.log("saving")
+        //save to local storage
+        data.list[currentNoteId].content = $textarea.innerHTML
+        data.list[currentNoteId].title = $titleinput.value
+        data.list[currentNoteId].time = (new Date()).getTime()
+        currentNoteId = 0
+        browser.storage.local.set({ list: data.list })
 
-          //save to gist
-          fetch(`https://api.github.com/gists/${data.gistid}`, {
-            method: "PATCH",
-            headers: {
-              Accept: "application/vnd.github+json",
-              Authorization: `Bearer ${data.map}`,
-            },
-            body: JSON.stringify({
-              description: `Gist to sync your tab-notes data. Last updated at: ${new Date().toLocaleString()}`,
-              files: { "tab-notes.html": { content: data.list.map(note => `${note.content}\n\n<<${note.time}>>\n\n`).filter(c => c).join('') } }
-            }),
-          }).then(async response => {
+        //save to gist
+        fetch(`https://api.github.com/gists/${data.gistid}`, {
+          method: "PATCH",
+          headers: {
+            Accept: "application/vnd.github+json",
+            Authorization: `Bearer ${data.map}`,
+          },
+          body: JSON.stringify({
+            description: `Gist to sync your tab-notes data. Last updated at: ${new Date().toLocaleString()}`,
+            files: { "tab-notes.html": { content: window.utils.serializeNotes(data.list) } }
+          })
+        }).then(async response => {
             if (!response.ok) {
               return response.text().then(text => { throw new Error(text) })
             }
@@ -243,7 +249,7 @@ transition-duration: .2s;
           _render(false);
           hide_timeout = setTimeout(() => $status.classList.add('hide'), 3000)
         }
-      })
+
       $textarea.focus()
     }
 
@@ -277,12 +283,14 @@ transition-duration: .2s;
       if (data.mode == THEMES.night) {
         $body.classList.add('dark')
         $textarea.classList.add('dark')
+        $titleinput.classList.add('dark')
         $list.classList.add('dark')
         $setting_gear.classList.add('dark')
       }
       else {
         $body.classList.remove('dark')
         $textarea.classList.remove('dark')
+        $titleinput.classList.remove('dark')
         $list.classList.remove('dark')
         $setting_gear.classList.remove('dark')
       }
@@ -294,6 +302,7 @@ transition-duration: .2s;
       $mode_switcher.addEventListener('click', event => {
         $body.classList.toggle('dark')
         $textarea.classList.toggle('dark')
+        $titleinput.classList.toggle('dark')
         $list.classList.toggle('dark')
 
         data.mode = data.mode === THEMES.day ? THEMES.night : THEMES.day
@@ -402,12 +411,7 @@ transition-duration: .2s;
           notecontent = out.files["tab-notes.html"].content
 
           //replace notes content
-          var tmp = notecontent.split(/\n\n<<([0-9]+)>>\n\n/g).slice(0, -1)
-          var newnotes = []
-          for (var i = 0; i < tmp.length; i += 2) {
-            newnotes.push({ content: tmp[i], time: parseInt(tmp[i + 1]) })
-          }
-          data.list = newnotes
+          data.list = window.utils.deserializeNotes(notecontent)
           browser.storage.local.set({ list: data.list })
 
           //add a "synced" text at the bottom
@@ -433,7 +437,7 @@ transition-duration: .2s;
           },
           body: JSON.stringify({
             description: `Gist to sync your tab-notes data. Last updated at: ${new Date().toLocaleString()}`,
-            files: { "tab-notes.html": { content: data.list.map(note => `${note.content}\n\n<<${note.time}>>\n\n`).filter(c => c).join('') } }
+            files: { "tab-notes.html": { content: window.utils.serializeNotes(data.list) } }
           })
         }).then(async response => {
           if (!response.ok) {

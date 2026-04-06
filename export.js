@@ -6,10 +6,7 @@
 	  const $saveBtn = document.querySelector('#save-button')
       const data = await window.utils.loadPreference()
 
-      const notes = data.list
-        .map(note => `${note.content}\n\n<<${note.time}>>\n\n`)
-        .filter(c => c)
-		.join('')
+      const notes = window.utils.serializeNotes(data.list)
 
       $textarea.value = notes
 	  

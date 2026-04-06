@@ -113,6 +113,7 @@
     }
 
     const _patUpdateButtonHandler = () => {
+      if (!$pat_update_button) return;
       $pat_update_button.addEventListener('click', async event => {
         if (confirm("This will save your GitHub personal access token in the browser's local storage. If a bad actor gets access to your PC e.g. by using a virus, they could access your personal access token. However, this data is safe from any website related attacks because it only exists purely locally on your PC.\n\nI'm not responsible for any damages that may occur. By clicking OK you confirm that you've read and accept these terms and conditions.")) {
           //I named it map instead of pat, so any malware that auto collects personal access tokens might have more difficulty finding the personal access token
@@ -153,12 +154,7 @@
                 console.log(`Link to the gist content: https://api.github.com/gists/${data.gistid}`);
                 if (confirm(`A gist named \"tab-notes.html\" was detected on your GitHub account. All of your notes will be replaced with the contents of this gist (a link to the gist content can be found in the devtools by pressing F12).\n\nPress OK if you want to continue.`)) {
                   //replace notes content
-                  var tmp = notecontent.split(/\n\n<<([0-9]+)>>\n\n/g).slice(0, -1)
-                  var newnotes = []
-                  for (var i = 0; i < tmp.length; i += 2) {
-                    newnotes.push({ content: tmp[i], time: parseInt(tmp[i + 1]) })
-                  }
-                  data.list = newnotes
+                  data.list = window.utils.deserializeNotes(notecontent)
                   browser.storage.local.set({ list: data.list })
                 }
               }).catch(error => {
@@ -176,12 +172,14 @@
     }
 
     const _patHelpButtonHandler = () => {
+      if (!$pat_help_button) return;
       $pat_help_button.addEventListener('click', event => {
         alert("To sync extensions across multiple devices, generate a personal access token on GitHub with the \"gist\" scope, and enter this personal access token in the input field, then press update.")
       })
     }
 
     const _syncStatusHandler = () => {
+      if (!$sync_status) return;
       if (data.map != undefined) {
         fetch(`https://api.github.com/gists`, {
           method: "GET",

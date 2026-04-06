@@ -38,6 +38,26 @@
 
       await browser.storage.local.set(update)
       return update
+    },
+    serializeNotes: (list) => {
+      return list.map(note => `${note.title ? `<<TITLE>>${note.title}<<\/TITLE>>\n` : ''}${note.content}\n\n<<${note.time}>>\n\n`).filter(c => c).join('')
+    },
+    deserializeNotes: (text) => {
+      var tmp = text.split(/\n\n<<([0-9]+)>>\n\n/g).slice(0, -1)
+      var newnotes = []
+      for (var i = 0; i < tmp.length; i += 2) {
+        let contentStr = tmp[i]
+        let title = ''
+        let titleMatch = contentStr.match(/^<<TITLE>>([\s\S]*?)<<\/TITLE>>\n/)
+        if (titleMatch) {
+          title = titleMatch[1]
+          contentStr = contentStr.substring(titleMatch[0].length)
+        }
+        let note = { content: contentStr, time: parseInt(tmp[i + 1]) }
+        if (title) note.title = title
+        newnotes.push(note)
+      }
+      return newnotes
     }
   }
 })()

@@ -8,13 +8,7 @@
       $importBtn.addEventListener('click', () => {
         if (confirm("Are you sure you want to import these notes? All of your current notes will be replaced. This action cannot be undone.")) {
 			console.log("replacing")
-			var tmp = $textarea.value
-				.split(/\n\n<<([0-9]+)>>\n\n/g)
-				.slice(0, -1)
-			var newnotes = []
-			for (var i = 0; i < tmp.length; i += 2) {
-				newnotes.push({content: tmp[i], time: parseInt(tmp[i+1])})
-			}
+			var newnotes = window.utils.deserializeNotes($textarea.value)
 			
 			data.list = newnotes
 			browser.storage.local.set({ list: data.list })
